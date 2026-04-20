@@ -1,71 +1,178 @@
 "use client";
-
-import { useState } from 'react';
+import { useState, useRef } from "react";
 
 export default function OcrLab() {
-  const [isScanning, setIsScanning] = useState(false);
+  const [image, setImage] = useState<string | null>(null);
+  const [medications, setMedications] = useState<any[]>([]);
+  const [analysis, setAnalysis] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const analyze = async () => {
+    if (!image) return;
+    setLoading(true);
+    setMedications([]);
+    setAnalysis([]);
+
+    try {
+      const formData = new FormData();
+      const blob = await (await fetch(image)).blob();
+      formData.append("file", blob, "rx_scan.jpg");
+
+      // Use localhost to avoid IP mapping issues
+      const res = await fetch("http://localhost:8000/ocr", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setMedications(data.medications);
+        setAnalysis(data.analysis || []);
+      } else {
+        alert("Server Error: " + data.error);
+      }
+    } catch {
+      alert("Error: Backend server is not responding!");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="animate-in fade-in zoom-in-95 duration-700 space-y-8">
-      
-      {/* --- HEADER --- */}
-      <div className="bg-[#0f172a] p-10 rounded-[50px] text-white flex justify-between items-center overflow-hidden relative shadow-2xl">
-        <div className="relative z-10">
-          <h3 className="text-3xl font-black italic tracking-tighter uppercase">OCR <span className="text-blue-500">Analysis Lab</span></h3>
-          <p className="text-blue-400 font-bold text-[9px] uppercase tracking-[0.4em] mt-2">Precision Prescription Scanning Technology</p>
-        </div>
-        <div className="text-5xl opacity-20 relative z-10">🔬</div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 opacity-10 blur-3xl"></div>
-      </div>
+    <div className="h-screen flex flex-col bg-slate-100 font-sans text-slate-800">
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        {/* --- SCANNING AREA --- */}
-        <div className="bg-white border-4 border-dashed border-blue-100 rounded-[60px] p-12 text-center flex flex-col items-center justify-center min-h-[400px] hover:border-blue-300 transition-colors">
-          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mb-6 text-3xl shadow-inner">📸</div>
-          <h4 className="text-xl font-black text-[#0f172a] mb-3 uppercase tracking-tight">Camera Preview</h4>
-          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest max-w-[200px] leading-relaxed">
-            Align prescription within the frame
-          </p>
-          
-          <button 
-            onClick={() => { setIsScanning(true); setTimeout(() => setIsScanning(false), 3000); }}
-            className="mt-10 bg-[#0f172a] text-white px-10 py-4 rounded-[22px] font-black uppercase text-[10px] tracking-[0.3em] hover:bg-blue-600 transition-all shadow-xl active:scale-95"
+      {/* HEADER */}
+      <div className="flex justify-between items-center px-10 py-4 bg-white shadow-sm border-b">
+        <div>
+          <h1 className="text-xl font-black text-blue-600 tracking-tighter">💊 RxLearn AI</h1>
+          <p className="text-[10px] uppercase text-slate-400 font-bold">Student Clinical Portal</p>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="bg-slate-50 border border-slate-200 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-100 transition-all"
           >
-            {isScanning ? "Processing..." : "Start Analysis"}
+            📂 Upload Rx
+          </button>
+
+          <button
+            onClick={analyze}
+            disabled={!image || loading}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 disabled:bg-slate-300 transition-all"
+          >
+            {loading ? "🔍 Analyzing..." : "Run Analysis"}
           </button>
         </div>
 
-        {/* --- RESULTS / INSTRUCTIONS PANEL --- */}
-        <div className="space-y-6">
-          <div className="bg-white p-10 rounded-[50px] border border-slate-100 shadow-sm h-full">
-            <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400 mb-8 border-b border-slate-50 pb-4">Analysis Requirements</h4>
-            
-            <div className="space-y-6">
-              {[
-                { title: "Lighting Quality", desc: "Ensure the room is well lit", check: "✅" },
-                { title: "Image Clarity", desc: "Keep the camera steady", check: "✅" },
-                { title: "Handwriting Style", desc: "Supports standard medical prints", check: "⚡" },
-              ].map((item, i) => (
-                <div key={i} className="flex items-start gap-4">
-                  <div className="text-lg">{item.check}</div>
-                  <div>
-                    <p className="text-[11px] font-black text-[#0f172a] uppercase">{item.title}</p>
-                    <p className="text-[10px] text-slate-400 font-medium">{item.desc}</p>
-                  </div>
+        <input
+          ref={fileRef}
+          type="file"
+          hidden
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = () => setImage(reader.result as string);
+              reader.readAsDataURL(file);
+            }
+          }}
+        />
+      </div>
+
+      {/* BODY */}
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* LEFT: IMAGE VIEWPORT */}
+        <div className="flex-1 flex flex-col items-center justify-center p-10 bg-slate-200/50 relative">
+          {!image ? (
+            <div className="text-center text-slate-400">
+              <div className="text-6xl mb-4">📄</div>
+              <p className="font-medium">Please upload a handwritten prescription</p>
+            </div>
+          ) : (
+            <img src={image} className="max-h-full rounded-xl shadow-2xl border-4 border-white" />
+          )}
+
+          {loading && (
+            <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center">
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p className="text-blue-600 font-bold animate-pulse uppercase text-xs tracking-widest">Neural Network Processing...</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: CLINICAL PANEL */}
+        <div className="w-[450px] bg-white p-6 overflow-y-auto border-l shadow-xl">
+          <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Extraction Data</h2>
+
+          {medications.length === 0 && !loading && (
+            <p className="text-sm text-slate-300 italic text-center py-20">Awaiting scan input...</p>
+          )}
+
+          {medications.map((m, i) => (
+            <div key={i} className={`mb-5 p-4 rounded-xl border ${m.verified ? 'bg-blue-50/50 border-blue-100 shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
+              
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h3 className="font-black text-slate-900 leading-tight">{m.brand_name}</h3>
+                  <p className="text-[11px] font-bold text-blue-600 uppercase tracking-tight">{m.generic_name}</p>
+                </div>
+                {m.verified && (
+                  <span className="text-[9px] bg-blue-600 text-white px-2 py-1 rounded font-bold">
+                    {m.confidence}%
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 my-3">
+                <div className="bg-white p-2 rounded border border-slate-100">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Strength</p>
+                  <p className="text-xs font-medium">{m.strength}</p>
+                </div>
+                <div className="bg-white p-2 rounded border border-slate-100">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Frequency</p>
+                  <p className="text-xs font-medium">{m.frequency}</p>
+                </div>
+              </div>
+
+              {m.verified && (
+                <p className="text-[11px] text-slate-600 leading-relaxed border-t pt-2 mt-2">
+                  <span className="font-bold text-blue-800">Insight:</span> {m.description}
+                </p>
+              )}
+
+              <div className="mt-3 pt-2 border-t border-slate-100">
+                <p className="text-[9px] font-mono text-slate-400">OCR Trace: "{m.raw_text}"</p>
+              </div>
+            </div>
+          ))}
+
+          {/* WARNINGS SECTION */}
+          {analysis.length > 0 && (
+            <div className="mt-8 pt-6 border-t border-slate-200">
+              <h3 className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-4">Clinical Safety Analysis</h3>
+              {analysis.map((a, i) => (
+                <div key={i} className="flex gap-3 bg-red-50 border border-red-100 p-3 rounded-lg mb-2 text-xs text-red-700 font-medium animate-bounce-short">
+                  <span>⚠️</span>
+                  <p>{a}</p>
                 </div>
               ))}
             </div>
-
-            <div className="mt-12 p-6 bg-blue-50 rounded-[30px] border border-blue-100">
-               <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-2">Pro Tip</p>
-               <p className="text-[10px] text-slate-600 font-medium italic">"Flatten the paper completely to avoid shadow distortions during the OCR process."</p>
-            </div>
-          </div>
+          )}
         </div>
-
       </div>
 
+      {/* FOOTER */}
+      <div className="bg-slate-900 text-slate-500 text-[10px] py-2 px-10 flex justify-between">
+        <span>© 2026 RxLearn Project • BIT Moratuwa</span>
+        <span>Engine: EasyOCR v1.7.2 + PyTorch</span>
+      </div>
     </div>
   );
 }

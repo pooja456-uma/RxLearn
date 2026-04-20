@@ -1,116 +1,175 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-import pytesseract
-from PIL import Image
-import io
+import easyocr
+import cv2
+import numpy as np
 import mysql.connector
-from pydantic import BaseModel
+import re
+import requests
+from rapidfuzz import fuzz
 
-# === CONFIGURATION ===
-# Ensure this path matches where Tesseract is installed on your PC
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
-# === APP SETUP ===
 app = FastAPI()
 
-# Allow your Next.js Frontend (Port 3000) to talk to this Backend
+# -------- CORS --------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], 
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# === DATABASE CONNECTION ===
+# -------- OCR --------
+reader = easyocr.Reader(['en'], gpu=False)
+
+# -------- DATABASE --------
 def get_db_connection():
     return mysql.connector.connect(
         host="localhost",
         user="root",
-        password="Root",  # Corrected with your password!
+        password="Root",
         database="rxlearn_db"
     )
 
-# === ROUTES ===
+# -------- HELPERS --------
+def clean_text(line):
+    line = line.upper()
+    line = re.sub(r'[^A-Z0-9 ]', ' ', line)
+    line = re.sub(r'\s+', ' ', line)
+    return line.strip()
 
-@app.get("/")
-def home():
-    return {"message": "RxLearn Backend is Running!", "status": "Connected to MySQL"}
+def extract_details(line):
+    strength = re.findall(r'\d+\s?(MG|ML|G|TAB|CAP)', line, re.IGNORECASE)
+    freq = re.findall(r'(BD|TDS|QID|OD|HS|Q4H|MANE|NOCTE)', line, re.IGNORECASE)
+    return {
+        "strength": strength[0].upper() if strength else "Not specified",
+        "frequency": freq[0].upper() if freq else "Not specified"
+    }
 
-# 1. OCR UPLOAD ROUTE
+def get_drug_info(text):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM drugs")
+    drugs = cursor.fetchall()
+
+    best = None
+    score_max = 0
+
+    for d in drugs:
+        score = max(
+            fuzz.partial_ratio(text, d['brand_name'].upper()),
+            fuzz.partial_ratio(text, d['generic_name'].upper())
+        )
+        if score > 55 and score > score_max:
+            best = d
+            score_max = score
+
+    cursor.close()
+    conn.close()
+    return best, score_max
+
+def analyze_safety(meds):
+    warnings = []
+    names = [m["generic_name"].upper() for m in meds if m["verified"]]
+
+    if len(names) != len(set(names)):
+        warnings.append("⚠️ Duplicate drug detected")
+
+    if any("PARACETAMOL" in n for n in names):
+        warnings.append("⚠️ Check max dose of Paracetamol (4g/day)")
+
+    if any("PANTOPRAZOLE" in n for n in names):
+        warnings.append("💡 Take PPI before meals")
+
+    return warnings
+
+# -------- OCR ENDPOINT --------
 @app.post("/ocr")
-async def read_prescription(file: UploadFile = File(...)):
+async def ocr_endpoint(file: UploadFile = File(...)):
     try:
-        # A. Read the image
         image_data = await file.read()
-        image = Image.open(io.BytesIO(image_data))
-        
-        # B. Extract text (The OCR Part)
-        extracted_text = pytesseract.image_to_string(image)
-        
-        # C. SAVE TO DATABASE (Prescriptions Table)
-        connection = get_db_connection()
-        cursor = connection.cursor()
-        
-        # Note: Make sure you have created the 'prescriptions' table in MySQL too!
-        sql = "INSERT INTO prescriptions (image_path, extracted_text) VALUES (%s, %s)"
-        val = (file.filename, extracted_text)
-        
-        cursor.execute(sql, val)
-        connection.commit() 
-        
-        cursor.close()
-        connection.close()
-        
-        return {"extracted_text": extracted_text, "success": True, "saved_to_db": True}
-        
-    except Exception as e:
-        print(f"Error: {e}") 
-        return {"error": str(e), "success": False}
+        nparr = np.frombuffer(image_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-# 2. HISTORY ROUTE (List previous scans)
-@app.get("/prescriptions")
-def get_history():
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True) 
-        
-        cursor.execute("SELECT * FROM prescriptions ORDER BY created_at DESC")
-        results = cursor.fetchall()
-        
-        cursor.close()
-        connection.close()
-        return results
-        
-    except Exception as e:
-        return {"error": str(e)}
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        enhanced = cv2.equalizeHist(gray)
 
-# 3. MASTER DRUG SEARCH (For the Educational Lab)
-@app.get("/drugs/{drug_name}")
-def get_drug_info(drug_name: str):
-    try:
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        
-        # Search logic remains the same (searching by Brand or Generic name)
-        sql = "SELECT * FROM drugs WHERE brand_name LIKE %s OR generic_name LIKE %s"
-        search_term = f"%{drug_name}%"
-        cursor.execute(sql, (search_term, search_term))
-        result = cursor.fetchone()
-        
-        cursor.close()
-        connection.close()
-        
-        if result:
-            # === PROFESSIONAL LABELS FOR USERS ===
-            return {
-                "Medicine_Name": result["brand_name"],
-                "Active_Ingredient": result["generic_name"],
-                "Usage_Category": result["category"],
-                "How_to_Use": result["description"]
-            }
-        
-        # Simple message if nothing is found
-        return {"Status": "Search Complete", "Result": "Medicine not found in our records."}
-        
+        results = reader.readtext(enhanced)
+
+        detected = []
+        ignore_list = ["NAME", "AGE", "SEX", "DATE", "LIC", "MBBS", "SIGN"]
+
+        for (_, text, conf) in results:
+            upper = text.upper().strip()
+
+            if conf < 0.2 or len(upper) < 3 or any(x in upper for x in ignore_list):
+                continue
+
+            clean = clean_text(upper)
+            match, score = get_drug_info(clean)
+            details = extract_details(upper)
+
+            if match:
+                detected.append({
+                    "raw_text": text,
+                    "brand_name": match["brand_name"],
+                    "generic_name": match["generic_name"],
+                    "category": match["category"],
+                    "description": match["description"],
+                    "confidence": round(score, 2),
+                    "verified": True,
+                    "strength": details["strength"],
+                    "frequency": details["frequency"]
+                })
+            else:
+                detected.append({
+                    "raw_text": text,
+                    "brand_name": clean,
+                    "generic_name": "Unknown",
+                    "category": "Review",
+                    "description": "Not found in database",
+                    "confidence": 0,
+                    "verified": False,
+                    "strength": details["strength"],
+                    "frequency": details["frequency"]
+                })
+
+        return {
+            "success": True,
+            "medications": detected,
+            "analysis": analyze_safety(detected)
+        }
+
     except Exception as e:
-        return {"error_details": str(e)}
+        return {"success": False, "error": str(e)}
+
+# -------- openFDA DICTIONARY --------
+@app.get("/dictionary/{drug_name}")
+async def get_drug_details(drug_name: str):
+    try:
+        # Try GENERIC name first (more reliable)
+        url = f"https://api.fda.gov/drug/label.json?search=openfda.generic_name:{drug_name}&limit=1"
+
+        response = requests.get(url)
+        data = response.json()
+
+        # If not found → try brand name
+        if "results" not in data:
+            url = f"https://api.fda.gov/drug/label.json?search=openfda.brand_name:{drug_name}&limit=1"
+            response = requests.get(url)
+            data = response.json()
+
+        if "results" not in data:
+            return {"success": False}
+
+        result = data["results"][0]
+
+        return {
+            "success": True,
+            "indications": result.get("indications_and_usage", ["No data"])[0],
+            "side_effects": result.get("adverse_reactions", ["No data"])[0],
+            "dosage": result.get("dosage_and_administration", ["No data"])[0],
+            "warnings": result.get("warnings", ["No data"])[0]
+        }
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
