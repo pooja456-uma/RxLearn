@@ -1,16 +1,12 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import easyocr
-import cv2
-import numpy as np
 import mysql.connector
-import re
 import requests
+import re
 from rapidfuzz import fuzz
 
 app = FastAPI()
 
-# -------- CORS --------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,10 +14,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -------- OCR --------
-reader = easyocr.Reader(['en'], gpu=False)
-
-# -------- DATABASE --------
+# ---------------- DB ----------------
 def get_db_connection():
     return mysql.connector.connect(
         host="localhost",
@@ -30,145 +23,62 @@ def get_db_connection():
         database="rxlearn_db"
     )
 
-# -------- HELPERS --------
-def clean_text(line):
-    line = line.upper()
-    line = re.sub(r'[^A-Z0-9 ]', ' ', line)
-    line = re.sub(r'\s+', ' ', line)
-    return line.strip()
-
-def extract_details(line):
-    strength = re.findall(r'\d+\s?(MG|ML|G|TAB|CAP)', line, re.IGNORECASE)
-    freq = re.findall(r'(BD|TDS|QID|OD|HS|Q4H|MANE|NOCTE)', line, re.IGNORECASE)
-    return {
-        "strength": strength[0].upper() if strength else "Not specified",
-        "frequency": freq[0].upper() if freq else "Not specified"
-    }
-
-def get_drug_info(text):
+# ---------------- SEARCH API ----------------
+@app.get("/api/drugs/search")
+async def search_drugs(query: str = "", category: str = "All"):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM drugs")
-    drugs = cursor.fetchall()
 
-    best = None
-    score_max = 0
+    sql = "SELECT * FROM drugs WHERE 1=1"
+    params = []
 
-    for d in drugs:
-        score = max(
-            fuzz.partial_ratio(text, d['brand_name'].upper()),
-            fuzz.partial_ratio(text, d['generic_name'].upper())
-        )
-        if score > 55 and score > score_max:
-            best = d
-            score_max = score
+    if category != "All":
+        sql += " AND therapeutic_group = %s"
+        params.append(category)
+
+    if query:
+        sql += " AND (brand_name LIKE %s OR generic_name LIKE %s)"
+        params.append(f"%{query}%")
+        params.append(f"%{query}%")
+
+    cursor.execute(sql, tuple(params))
+    results = cursor.fetchall()
 
     cursor.close()
     conn.close()
-    return best, score_max
+    return results
 
-def analyze_safety(meds):
-    warnings = []
-    names = [m["generic_name"].upper() for m in meds if m["verified"]]
+# ---------------- CATEGORY API ----------------
+@app.get("/api/categories")
+async def get_categories():
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
-    if len(names) != len(set(names)):
-        warnings.append("⚠️ Duplicate drug detected")
+    cursor.execute("SELECT DISTINCT therapeutic_group FROM drugs")
+    categories = [row[0] for row in cursor.fetchall()]
 
-    if any("PARACETAMOL" in n for n in names):
-        warnings.append("⚠️ Check max dose of Paracetamol (4g/day)")
+    cursor.close()
+    conn.close()
+    return {"categories": categories}
 
-    if any("PANTOPRAZOLE" in n for n in names):
-        warnings.append("💡 Take PPI before meals")
-
-    return warnings
-
-# -------- OCR ENDPOINT --------
-@app.post("/ocr")
-async def ocr_endpoint(file: UploadFile = File(...)):
-    try:
-        image_data = await file.read()
-        nparr = np.frombuffer(image_data, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        enhanced = cv2.equalizeHist(gray)
-
-        results = reader.readtext(enhanced)
-
-        detected = []
-        ignore_list = ["NAME", "AGE", "SEX", "DATE", "LIC", "MBBS", "SIGN"]
-
-        for (_, text, conf) in results:
-            upper = text.upper().strip()
-
-            if conf < 0.2 or len(upper) < 3 or any(x in upper for x in ignore_list):
-                continue
-
-            clean = clean_text(upper)
-            match, score = get_drug_info(clean)
-            details = extract_details(upper)
-
-            if match:
-                detected.append({
-                    "raw_text": text,
-                    "brand_name": match["brand_name"],
-                    "generic_name": match["generic_name"],
-                    "category": match["category"],
-                    "description": match["description"],
-                    "confidence": round(score, 2),
-                    "verified": True,
-                    "strength": details["strength"],
-                    "frequency": details["frequency"]
-                })
-            else:
-                detected.append({
-                    "raw_text": text,
-                    "brand_name": clean,
-                    "generic_name": "Unknown",
-                    "category": "Review",
-                    "description": "Not found in database",
-                    "confidence": 0,
-                    "verified": False,
-                    "strength": details["strength"],
-                    "frequency": details["frequency"]
-                })
-
-        return {
-            "success": True,
-            "medications": detected,
-            "analysis": analyze_safety(detected)
-        }
-
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-# -------- openFDA DICTIONARY --------
+# ---------------- openFDA ----------------
 @app.get("/dictionary/{drug_name}")
 async def get_drug_details(drug_name: str):
     try:
-        # Try GENERIC name first (more reliable)
         url = f"https://api.fda.gov/drug/label.json?search=openfda.generic_name:{drug_name}&limit=1"
+        res = requests.get(url).json()
 
-        response = requests.get(url)
-        data = response.json()
-
-        # If not found → try brand name
-        if "results" not in data:
-            url = f"https://api.fda.gov/drug/label.json?search=openfda.brand_name:{drug_name}&limit=1"
-            response = requests.get(url)
-            data = response.json()
-
-        if "results" not in data:
+        if "results" not in res:
             return {"success": False}
 
-        result = data["results"][0]
+        r = res["results"][0]
 
         return {
             "success": True,
-            "indications": result.get("indications_and_usage", ["No data"])[0],
-            "side_effects": result.get("adverse_reactions", ["No data"])[0],
-            "dosage": result.get("dosage_and_administration", ["No data"])[0],
-            "warnings": result.get("warnings", ["No data"])[0]
+            "indications": r.get("indications_and_usage", ["N/A"])[0],
+            "side_effects": r.get("adverse_reactions", ["N/A"])[0],
+            "dosage": r.get("dosage_and_administration", ["N/A"])[0],
+            "warnings": r.get("warnings", ["N/A"])[0],
         }
 
     except Exception as e:

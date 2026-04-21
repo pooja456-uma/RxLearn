@@ -1,106 +1,187 @@
 "use client";
 
+import { useState } from "react";
+
 export default function RxForum() {
-  const posts = [
+  const [newPost, setNewPost] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const [posts, setPosts] = useState([
     {
       id: "4552",
       tag: "OCR LAB",
       author: "Student #1024",
-      content: "Does anyone have tips for scanning prescriptions with very low lighting in the OCR lab?",
-      replies: 12
+      content:
+        "Does anyone have tips for scanning prescriptions in low lighting conditions?",
+      replies: 12,
+      likes: 4,
+      liked: false,
     },
     {
       id: "4558",
       tag: "PHARMACOLOGY",
       author: "Student #2088",
-      content: "Can someone explain the primary contraindications for Metformin in patients with renal impairment?",
-      replies: 5
-    }
-  ];
+      content:
+        "Can someone explain Metformin contraindications in renal impairment?",
+      replies: 5,
+      likes: 9,
+      liked: false,
+    },
+  ]);
+
+  const handlePost = () => {
+    if (!newPost.trim()) return;
+
+    setLoading(true);
+
+    setTimeout(() => {
+      const createdPost = {
+        id: Math.floor(Math.random() * 9000).toString(),
+        tag: "GENERAL",
+        author: "You",
+        content: newPost,
+        replies: 0,
+        likes: 0,
+        liked: false,
+      };
+
+      setPosts([createdPost, ...posts]);
+      setNewPost("");
+      setLoading(false);
+    }, 500);
+  };
+
+  const toggleLike = (id: string) => {
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              likes: p.liked ? p.likes - 1 : p.likes + 1,
+              liked: !p.liked,
+            }
+          : p
+      )
+    );
+  };
 
   return (
-    <div className="animate-in fade-in duration-700 space-y-8">
-      
-      {/* --- FORUM HEADER --- */}
-      <div className="bg-[#0f172a] p-12 rounded-[50px] text-white shadow-xl shadow-blue-900/10 relative overflow-hidden">
-        <div className="relative z-10">
-          <h3 className="text-4xl font-black italic tracking-tighter uppercase">Rx<span className="text-blue-500">Forum</span></h3>
-          <p className="text-blue-400 font-bold text-[10px] uppercase tracking-[0.4em] mt-2">
-            The Digital Pharmacy Discussion Hub
-          </p>
-        </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 opacity-10 blur-3xl"></div>
+    <div className="max-w-6xl mx-auto p-6 space-y-10 bg-pink-50 min-h-screen">
+
+      {/* HEADER */}
+      <div className="text-center space-y-1">
+        <h1 className="text-3xl font-black text-slate-800">
+          💊 Rx<span className="text-pink-500">Forum</span>
+        </h1>
+        <p className="text-xs text-slate-400 uppercase tracking-[0.3em]">
+          friendly pharmacy discussion space ✨
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* --- MAIN FEED --- */}
+      <div className="grid lg:grid-cols-3 gap-8">
+
+        {/* LEFT */}
         <div className="lg:col-span-2 space-y-6">
-          {/* New Post Input Box */}
-          <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm">
-            <div className="flex gap-4">
-              <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 font-black text-xs shadow-inner">P</div>
-              <input 
-                type="text" 
-                placeholder="Start a new discussion..." 
-                className="flex-1 bg-slate-50 border-none outline-none p-4 rounded-2xl text-xs font-bold focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
-              />
-              <button className="bg-blue-600 text-white px-6 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-[#0f172a] transition-all">
-                Post
+
+          {/* POST BOX */}
+          <div className="bg-white p-6 rounded-[30px] shadow-sm border border-pink-100 space-y-4">
+
+            <textarea
+              value={newPost}
+              onChange={(e) => setNewPost(e.target.value)}
+              placeholder="Share your question or idea... 💬"
+              className="w-full p-5 rounded-2xl bg-pink-50 border-none outline-none focus:ring-2 focus:ring-pink-200 min-h-[120px] text-sm"
+            />
+
+            <div className="flex justify-end">
+              <button
+                onClick={handlePost}
+                disabled={!newPost.trim() || loading}
+                className="px-6 py-3 rounded-full bg-pink-500 text-white text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-pink-600 disabled:opacity-40 transition-all"
+              >
+                {loading ? "posting..." : "post 💌"}
               </button>
             </div>
+
           </div>
 
-          {/* Discussion Cards */}
+          {/* POSTS */}
           {posts.map((post) => (
-            <div key={post.id} className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm hover:border-blue-200 transition-all group">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full uppercase tracking-widest">
-                  {post.tag} • ID #{post.id}
+            <div
+              key={post.id}
+              className="bg-white p-6 rounded-[30px] border border-pink-100 shadow-sm space-y-4 hover:shadow-md transition-all"
+            >
+
+              {/* TAG */}
+              <div className="flex justify-between text-[9px] font-black uppercase tracking-widest">
+                <span className="bg-pink-100 text-pink-600 px-2 py-1 rounded-full">
+                  {post.tag}
                 </span>
-                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">{post.author}</span>
+                <span className="text-slate-300">
+                  {post.author} ✨
+                </span>
               </div>
-              
-              <p className="text-slate-800 font-bold text-sm leading-relaxed mb-6 italic group-hover:text-[#0f172a] transition-colors">
-                "{post.content}"
+
+              {/* CONTENT */}
+              <p className="text-slate-700 font-medium italic">
+                “{post.content}”
               </p>
-              
-              <div className="h-[1px] w-full bg-slate-50 mb-6"></div>
-              
-              <div className="flex justify-between items-center">
-                <button className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-blue-600 flex items-center gap-2">
-                  <span>💬</span> {post.replies} Replies
+
+              {/* ACTIONS */}
+              <div className="flex justify-between items-center pt-3 border-t border-pink-50">
+
+                <button
+                  onClick={() => toggleLike(post.id)}
+                  className={`text-[10px] font-black uppercase flex items-center gap-1 ${
+                    post.liked
+                      ? "text-rose-400"
+                      : "text-slate-400 hover:text-rose-400"
+                  }`}
+                >
+                  💖 {post.likes}
                 </button>
-                <button className="text-[9px] font-black text-white bg-[#0f172a] px-5 py-2 rounded-xl uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-slate-200">
-                  Join Discussion
+
+                <span className="text-[10px] text-slate-400">
+                  💬 {post.replies} replies
+                </span>
+
+                <button className="bg-slate-800 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase hover:bg-pink-500 transition-all">
+                  join ✨
                 </button>
+
               </div>
             </div>
           ))}
         </div>
 
-        {/* --- SIDEBAR: TRENDING --- */}
+        {/* SIDEBAR */}
         <div className="space-y-6">
-          <div className="bg-white p-8 rounded-[50px] border border-slate-100 shadow-sm">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-6">Trending Topics</h4>
-            <div className="space-y-4">
-              {["#DosageMath", "#OCR_Troubles", "#EthicsAssignment"].map((topic, i) => (
-                <div key={i} className="flex justify-between items-center group cursor-pointer">
-                  <span className="text-xs font-black text-[#0f172a] group-hover:text-blue-600 transition-colors">{topic}</span>
-                  <span className="text-[9px] font-bold text-slate-300">2.4k posts</span>
-                </div>
+
+          <div className="bg-white p-6 rounded-[30px] border border-pink-100">
+            <h3 className="text-xs font-black uppercase text-slate-400 mb-4">
+              trending 🌸
+            </h3>
+
+            <div className="space-y-3 text-sm">
+              {["#OCR_Tips", "#DosageFun", "#PharmaLife"].map((t) => (
+                <p
+                  key={t}
+                  className="font-bold text-slate-700 hover:text-pink-500 cursor-pointer transition-colors"
+                >
+                  {t}
+                </p>
               ))}
             </div>
           </div>
 
-          <div className="bg-blue-50 p-8 rounded-[50px] border border-blue-100">
-            <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-3">Forum Guidelines</p>
-            <p className="text-[10px] text-slate-600 font-medium leading-relaxed">
-              Maintain professional ethics. Do not share confidential patient data or specific exam answers.
+          <div className="bg-pink-100 p-6 rounded-[30px] text-xs text-slate-600">
+            <p className="font-black text-pink-600 mb-2">
+              community rules 💖
             </p>
+            Be kind, respect others, and never share patient data.
           </div>
-        </div>
 
+        </div>
       </div>
     </div>
   );

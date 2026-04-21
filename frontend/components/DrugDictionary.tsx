@@ -1,175 +1,238 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
+
+const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+interface Drug {
+  generic_name: string;
+  therapeutic_group: string;
+  indications: string;
+  side_effects: string;
+  counseling_points: string;
+  brands: string[];
+}
 
 export default function DrugDictionary() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDrug, setSelectedDrug] = useState<any | null>(null);
-  const [liveData, setLiveData] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [selectedLetter, setSelectedLetter] = useState("All");
+  const [selectedGroup, setSelectedGroup] = useState("All Categories");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [drugs, setDrugs] = useState<any[]>([]);
+  const [selectedDrugName, setSelectedDrugName] = useState<string | null>(null);
 
-  const drugs = [
-    { name: "Amoxicillin", type: "Antibiotic", usage: "Bacterial Infections", color: "bg-blue-100 text-blue-600" },
-    { name: "Metformin", type: "Antidiabetic", usage: "Type 2 Diabetes", color: "bg-emerald-100 text-emerald-600" },
-    { name: "Atorvastatin", type: "Statin", usage: "High Cholesterol", color: "bg-rose-100 text-rose-600" },
-    { name: "Paracetamol", type: "Analgesic", usage: "Pain & Fever", color: "bg-amber-100 text-amber-600" },
-    { name: "Pantoprazole", type: "PPI", usage: "Acid Reflux", color: "bg-indigo-100 text-indigo-600" },
-  ];
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/api/categories")
+      .then((res) => res.json())
+      .then((data) => setCategories(data.categories || []));
+  }, []);
 
-  const fetchLiveDetails = async (drugName: string) => {
-    setLoading(true);
-    setSelectedDrug(drugName);
-    setLiveData(null);
-    setError("");
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/api/drugs/search?query=")
+      .then((res) => res.json())
+      .then((data) => setDrugs(data));
+  }, []);
 
-    try {
-      const res = await fetch(`http://127.0.0.1:8000/dictionary/${drugName}`);
-
-      if (!res.ok) {
-        throw new Error("Server not responding");
+  const grouped = useMemo(() => {
+    const map: Record<string, Drug> = {};
+    drugs.forEach((d) => {
+      const key = d.generic_name || "Unknown";
+      if (!map[key]) {
+        map[key] = { ...d, brands: [] };
       }
-
-      const data = await res.json();
-
-      if (data.success) {
-        setLiveData(data);
-      } else {
-        setError("No clinical data found in FDA database.");
+      if (!map[key].brands.includes(d.brand_name)) {
+        map[key].brands.push(d.brand_name);
       }
+    });
+    return Object.values(map);
+  }, [drugs]);
 
-    } catch (err) {
-      setError("❌ Cannot connect to backend. Make sure FastAPI is running.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const filtered = useMemo(() => {
+    return grouped.filter((d) => {
+      const letterOk =
+        selectedLetter === "All" ||
+        d.generic_name?.toUpperCase().startsWith(selectedLetter);
 
-  const filteredDrugs = drugs.filter(d =>
-    d.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      const groupOk =
+        selectedGroup === "All Categories" ||
+        d.therapeutic_group === selectedGroup;
+
+      return letterOk && groupOk;
+    });
+  }, [grouped, selectedLetter, selectedGroup]);
+
+  const selectedDrug =
+    selectedDrugName &&
+    grouped.find((d) => d.generic_name === selectedDrugName);
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="relative h-screen flex overflow-hidden bg-gradient-to-br from-pink-200 via-purple-200 to-blue-200">
 
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-6 bg-white p-6 rounded-2xl shadow">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-800">
-            💊 Drug Dictionary
-          </h1>
-          <p className="text-sm text-slate-400">
-            Search and explore clinical drug profiles
+      {/* FLOATING ANIMATIONS */}
+      <FloatingDecor />
+
+      {/* LEFT PANEL */}
+      <div className="w-[40%] p-4 overflow-y-auto space-y-4 border-r bg-white/60 backdrop-blur-xl z-10">
+
+        <div className="bg-gradient-to-r from-pink-400 to-purple-400 text-white p-4 rounded-2xl shadow">
+          <h1 className="text-lg font-black">💊 RxLearn</h1>
+          <p className="text-[10px] uppercase tracking-widest opacity-80">
+            Cute Clinical Companion ✨
           </p>
         </div>
 
-        <input
-          type="text"
-          placeholder="Search drugs..."
-          className="w-full md:w-80 px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500"
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+        <select
+          value={selectedGroup}
+          onChange={(e) => {
+            setSelectedGroup(e.target.value);
+            setSelectedDrugName(null);
+          }}
+          className="w-full p-2 rounded-xl border bg-pink-50 text-sm shadow"
+        >
+          <option>All Categories</option>
+          {categories.map((c) => (
+            <option key={c}>{c}</option>
+          ))}
+        </select>
+
+        <div className="flex flex-wrap gap-1">
+          <button
+            onClick={() => setSelectedLetter("All")}
+            className="px-2 py-1 text-[10px] rounded-full bg-yellow-200"
+          >
+            ✨ All
+          </button>
+          {alphabet.map((l) => (
+            <button
+              key={l}
+              onClick={() => setSelectedLetter(l)}
+              className={`px-2 py-1 text-[10px] rounded-full transition ${
+                selectedLetter === l
+                  ? "bg-purple-500 text-white"
+                  : "bg-white border"
+              }`}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          {filtered.map((drug, i) => (
+            <div
+              key={i}
+              onClick={() => setSelectedDrugName(drug.generic_name)}
+              className="p-3 rounded-2xl border bg-gradient-to-r from-white to-pink-50 hover:shadow-lg cursor-pointer transition"
+            >
+              <p className="font-bold text-sm text-purple-700">{drug.generic_name}</p>
+              <p className="text-[9px] text-pink-500 uppercase">
+                {drug.therapeutic_group}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* DRUG LIST */}
-      <div className="grid md:grid-cols-2 gap-5">
-        {filteredDrugs.map((drug) => (
-          <div
-            key={drug.name}
-            className="bg-white p-5 rounded-xl shadow hover:shadow-lg transition-all border"
-          >
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-slate-800">
-                {drug.name}
-              </h2>
+      {/* RIGHT PANEL */}
+      <div className="w-[60%] p-6 overflow-y-auto z-10">
 
-              <span className={`text-xs px-3 py-1 rounded-full ${drug.color}`}>
-                {drug.type}
-              </span>
+        {!selectedDrug ? (
+          <div className="h-full flex flex-col items-center justify-center text-purple-300">
+            <div className="text-6xl">🧸💊</div>
+            <p className="text-xs mt-2">Pick a medicine to explore ✨</p>
+          </div>
+        ) : (
+          <div className="space-y-4 max-w-2xl mx-auto">
+
+            <div className="bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white p-6 rounded-3xl shadow-xl">
+              <h2 className="text-2xl font-black">{selectedDrug.generic_name}</h2>
+              <p className="text-xs uppercase opacity-80">
+                {selectedDrug.therapeutic_group}
+              </p>
             </div>
 
-            <p className="text-sm text-slate-500 mt-1">{drug.usage}</p>
+            <Card title="✨ Indications" text={selectedDrug.indications} />
+            <Card title="⚠️ Side Effects" text={selectedDrug.side_effects} />
+            <Card title="💡 Tips" text={selectedDrug.counseling_points} highlight />
 
             <button
-              onClick={() => fetchLiveDetails(drug.name)}
-              className="mt-4 w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-500 transition"
+              onClick={() => setSelectedDrugName(null)}
+              className="w-full mt-4 py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 text-white text-xs font-bold shadow"
             >
-              View Clinical Profile
+              Close 💕
             </button>
           </div>
-        ))}
+        )}
       </div>
-
-      {/* MODAL */}
-      {selectedDrug && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
-
-            {/* HEADER */}
-            <div className="p-5 border-b flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">
-                  {selectedDrug}
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Clinical Reference Data
-                </p>
-              </div>
-
-              <button
-                onClick={() => setSelectedDrug(null)}
-                className="text-slate-500 hover:text-red-500 text-lg"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* CONTENT */}
-            <div className="p-6 overflow-y-auto space-y-4">
-
-              {loading && (
-                <div className="text-center text-blue-500 font-medium py-10 animate-pulse">
-                  🔄 Fetching data from FDA...
-                </div>
-              )}
-
-              {error && (
-                <div className="text-center text-red-500 font-medium py-10">
-                  {error}
-                </div>
-              )}
-
-              {!loading && liveData && (
-                <>
-                  <Section title="Indications" data={liveData.indications} />
-                  <Section title="Side Effects" data={liveData.side_effects} />
-                  <Section title="Dosage" data={liveData.dosage} />
-                  <Section title="Warnings" data={liveData.warnings} />
-                </>
-              )}
-
-            </div>
-
-            {/* FOOTER */}
-            <div className="text-center text-xs text-slate-400 p-3 border-t">
-              Powered by openFDA • Educational use only
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-function Section({ title, data }: { title: string; data: any }) {
-  const text = Array.isArray(data) ? data[0] : data;
+function FloatingDecor() {
+  const items = ["💊", "💖", "🫧", "💗", "💊", "🫧"];
 
   return (
-    <div className="bg-slate-50 p-4 rounded-lg border">
-      <h3 className="font-semibold text-blue-600 mb-2">{title}</h3>
-      <p className="text-sm text-slate-700 whitespace-pre-line">
-        {text?.substring(0, 500) || "No data available"}
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {items.map((icon, i) => (
+        <span
+          key={i}
+          className="absolute text-2xl animate-float"
+          style={{
+            left: `${Math.random() * 100}%`,
+            animationDuration: `${6 + Math.random() * 6}s`,
+            animationDelay: `${Math.random() * 5}s`,
+          }}
+        >
+          {icon}
+        </span>
+      ))}
+
+      <style jsx>{`
+        .animate-float {
+          bottom: -50px;
+          animation-name: floatUp;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+        }
+
+        @keyframes floatUp {
+          0% {
+            transform: translateY(0) scale(1);
+            opacity: 0.7;
+          }
+          50% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(-110vh) scale(1.2);
+            opacity: 0;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function Card({
+  title,
+  text,
+  highlight = false,
+}: {
+  title: string;
+  text?: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div
+      className={`p-5 rounded-2xl shadow-md border ${
+        highlight
+          ? "bg-gradient-to-r from-yellow-100 to-pink-100 border-yellow-300"
+          : "bg-white"
+      }`}
+    >
+      <p className="text-[10px] font-black uppercase text-purple-400 mb-2">
+        {title}
       </p>
+      <p className="text-sm text-slate-700">{text || "No data yet 💭"}</p>
     </div>
   );
 }
