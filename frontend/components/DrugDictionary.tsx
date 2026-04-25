@@ -1,4 +1,3 @@
-// FULL CLEAN INTERACTIVE PREMIUM DrugDictionary — fixed messy spacing/UI
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -68,27 +67,36 @@ export default function DrugDictionary() {
       <FloatingDecor />
 
       {/* LEFT SIDEBAR */}
-      <div className="w-[32%] min-w-[320px] bg-white/80 backdrop-blur-xl border-r border-purple-100 shadow-xl flex flex-col z-20">
+      <div className="w-[32%] min-w-[320px] bg-white border-r border-purple-100 shadow-xl flex flex-col z-20 relative">
         <div className="p-5 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white shadow-lg">
           <h1 className="text-2xl font-black">💊 RxLearn</h1>
           <p className="text-[10px] tracking-[0.3em] uppercase opacity-80">Interactive Drug Explorer</p>
         </div>
 
-        <div className="p-4 space-y-4 border-b bg-white/60">
-          <select
-            value={selectedGroup}
-            onChange={(e) => {
-              setSelectedGroup(e.target.value);
-              setSelectedDrugName(null);
-            }}
-            className="w-full p-3 rounded-xl border border-purple-100 text-xs font-bold shadow-sm outline-none"
-          >
-            <option>All Categories</option>
-            {categories.map((c) => <option key={c}>{c}</option>)}
-          </select>
+        {/* Dropdown Container with improved Z-Index */}
+        <div className="p-4 space-y-4 border-b bg-white relative z-50">
+          <div className="relative">
+             <label className="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-1 block ml-1">Filter Specialty</label>
+             <select
+               value={selectedGroup}
+               onChange={(e) => {
+                 setSelectedGroup(e.target.value);
+                 setSelectedDrugName(null);
+               }}
+               /* Added z-50 and relative to the select itself */
+               className="w-full p-3 rounded-xl border-2 border-purple-100 text-xs font-bold shadow-sm outline-none bg-white cursor-pointer hover:border-purple-300 transition-all relative z-50"
+             >
+               <option value="All Categories">All Categories</option>
+               {categories.map((c) => (
+                 <option key={c} value={c}>
+                   {c}
+                 </option>
+               ))}
+             </select>
+          </div>
 
           <div className="flex flex-wrap gap-1 justify-center">
-            <button onClick={() => setSelectedLetter("All")} className="px-3 py-1 rounded-full bg-pink-200 text-[10px] font-bold">All</button>
+            <button onClick={() => setSelectedLetter("All")} className={`px-3 py-1 rounded-full text-[10px] font-bold ${selectedLetter === "All" ? "bg-purple-500 text-white" : "bg-pink-200"}`}>All</button>
             {alphabet.map((l) => (
               <button
                 key={l}
@@ -101,7 +109,7 @@ export default function DrugDictionary() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-white/50">
           {filtered.map((drug, i) => (
             <div
               key={i}

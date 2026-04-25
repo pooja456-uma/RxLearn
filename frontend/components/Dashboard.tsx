@@ -3,126 +3,90 @@
 import { useState } from "react";
 
 export default function Dashboard() {
-  const [stats] = useState({
-    scans: 24,
-    drugsLearned: 156,
-    quizScore: "88%",
-    rank: "#04",
-  });
-
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-8 animate-in fade-in duration-700">
+    <div className="min-h-screen bg-gradient-to-b from-pink-50 via-white to-blue-50 text-slate-900 pb-20">
+      
+      {/* 🌸 HERO SECTION */}
+      <div className="relative h-[70vh] flex items-center justify-center overflow-hidden px-6">
+        
+        <div className="absolute inset-0 z-0">
+          <img
+            src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?q=80&w=2070&auto=format&fit=crop"
+            className="w-full h-full object-cover opacity-20"
+            alt="medical"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-pink-100/40 via-white/70 to-blue-50"></div>
+        </div>
 
-      {/* HEADER */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 to-pink-500 text-white p-10 rounded-[40px] shadow-xl">
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="relative z-10 max-w-5xl text-center space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-1000">
           
-          <div>
-            <h1 className="text-3xl font-black tracking-tighter">
-              🧸 Student <span className="italic">Dossier</span>
-            </h1>
-            <p className="text-[10px] uppercase tracking-[0.3em] opacity-80 mt-2">
-              Welcome back, Pooja • Your learning journey continues 💊
-            </p>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/70 border border-pink-200 rounded-full shadow-sm backdrop-blur-md">
+            <span className="text-pink-500 animate-bounce">💊</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500">
+              Cute Clinical Learning Space
+            </span>
           </div>
 
-          <div className="flex gap-3">
-            <Action icon="🔬" label="OCR Lab" />
-            <Action icon="📚" label="Dictionary" />
-          </div>
-        </div>
+          <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-none text-slate-800">
+            Meet <span className="text-pink-500">RxLearn</span> ✨<br />
+            Your Study Buddy
+          </h1>
 
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/20 rounded-full blur-2xl"></div>
-      </div>
-
-      {/* STATS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Stat label="OCR Scans" value={stats.scans} emoji="📷" />
-        <Stat label="Drugs Learned" value={stats.drugsLearned} emoji="💊" />
-        <Stat label="Quiz Score" value={stats.quizScore} emoji="🎯" />
-        <Stat label="Rank" value={stats.rank} emoji="🏆" />
-      </div>
-
-      {/* MAIN GRID */}
-      <div className="grid lg:grid-cols-3 gap-6">
-
-        {/* PROGRESS */}
-        <div className="lg:col-span-2 bg-white p-8 rounded-[35px] border shadow-sm space-y-6">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-            Learning Progress
-          </h3>
-
-          <Progress label="Antibiotics" value={85} />
-          <Progress label="Cardiology" value={42} />
-          <Progress label="CNS Drugs" value={60} />
-          <Progress label="GI System" value={92} />
-        </div>
-
-        {/* ACTIVITY */}
-        <div className="bg-slate-900 text-white p-8 rounded-[35px] shadow-xl space-y-6">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 text-center">
-            Recent Activity
-          </h3>
-
-          <Activity title="Amoxicillin Scan" time="Today" status="Done" />
-          <Activity title="Quiz Attempt" time="Yesterday" status="A+" />
-          <Activity title="Metformin Review" time="2d ago" status="Viewed" />
-
-          <button className="w-full mt-4 py-3 rounded-2xl bg-blue-600 text-xs font-black uppercase tracking-widest hover:bg-pink-500 transition-all">
-            Download Report 📄
-          </button>
+          <p className="text-slate-600 text-lg md:text-xl max-w-2xl mx-auto font-medium leading-relaxed">
+            Turn boring prescriptions into a fun, interactive learning adventure for pharmacy students 💖
+          </p>
         </div>
       </div>
-    </div>
-  );
-}
 
-/* -------- COMPONENTS -------- */
-
-function Stat({ label, value, emoji }: any) {
-  return (
-    <div className="bg-white p-6 rounded-3xl border text-center hover:scale-105 transition">
-      <div className="text-xl">{emoji}</div>
-      <p className="text-[10px] font-black uppercase text-slate-400 mt-2">{label}</p>
-      <p className="text-3xl font-black text-slate-800 mt-1">{value}</p>
-    </div>
-  );
-}
-
-function Progress({ label, value }: any) {
-  return (
-    <div>
-      <div className="flex justify-between text-xs font-bold mb-1">
-        <span>{label}</span>
-        <span>{value}%</span>
-      </div>
-      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-gradient-to-r from-blue-500 to-pink-500 rounded-full transition-all"
-          style={{ width: `${value}%` }}
+      {/* 🌈 FEATURE CARDS */}
+      <div className="max-w-7xl mx-auto px-6 -mt-28 relative z-20 grid md:grid-cols-3 gap-6">
+        <FeatureBox
+          icon="🔬"
+          title="OCR Magic Lab"
+          desc="Snap prescriptions & watch decode them instantly ✨"
         />
+        <FeatureBox icon="🧠" title="Quiz Garden" desc="Play MCQs & grow your clinical knowledge 🌱" />
+        <FeatureBox icon="📚" title="Drug Library" desc="Explore medicines like a smart digital encyclopedia 💊" />
+      </div>
+
+      {/* 🌸 MISSION */}
+      <div className="max-w-4xl mx-auto mt-24 text-center px-6 space-y-8">
+        <h2 className="text-3xl font-black text-slate-800">
+          Learning made simple & cute 💕
+        </h2>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <ObjectiveItem text="helps you read prescriptions easily ✨" />
+          <ObjectiveItem text="Track your learning progress 📊" />
+          <ObjectiveItem text="Practice MCQs like a game 🎯" />
+          <ObjectiveItem text="Safe clinical decision training 🩺" />
+        </div>
       </div>
     </div>
   );
 }
 
-function Activity({ title, time, status }: any) {
+/* 🌸 COMPONENTS */
+
+function FeatureBox({ icon, title, desc }: any) {
   return (
-    <div className="bg-white/10 p-4 rounded-2xl border border-white/10">
-      <p className="text-sm font-bold">{title}</p>
-      <p className="text-[9px] text-slate-400 uppercase">{time}</p>
-      <span className="text-[9px] text-blue-300 font-black uppercase">
-        {status}
+    <div className="bg-white rounded-[40px] p-10 border border-pink-100 shadow-sm hover:shadow-xl hover:-translate-y-2 transition-all duration-300 text-center">
+      <div className="text-5xl mb-4 animate-pulse">{icon}</div>
+      <h3 className="text-xl font-black text-slate-800">{title}</h3>
+      <p className="text-sm text-slate-500 mt-3 leading-relaxed">
+        {desc}
+      </p>
+    </div>
+  );
+}
+
+function ObjectiveItem({ text }: { text: string }) {
+  return (
+    <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-pink-100 shadow-sm hover:scale-[1.02] transition">
+      <span className="text-pink-500">💗</span>
+      <span className="text-xs font-bold uppercase tracking-widest text-slate-600">
+        {text}
       </span>
     </div>
-  );
-}
-
-function Action({ icon, label }: any) {
-  return (
-    <button className="flex items-center gap-2 px-4 py-2 bg-white/20 rounded-xl hover:bg-white hover:text-blue-600 transition">
-      <span>{icon}</span>
-      <span className="text-[10px] font-black uppercase">{label}</span>
-    </button>
   );
 }
