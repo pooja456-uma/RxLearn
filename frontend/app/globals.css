@@ -1,12 +1,17 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 :root {
-  --background: #f8fafc; /* Very light gray/white */
-  --foreground: #0f172a; /* Dark navy text */
-  --medical-primary: #0d9488; /* Professional Teal */
-  --medical-secondary: #2dd4bf; /* Bright Mint */
+  /* Matte theme light gray/slate backdrop from image */
+  --background: #EBF0F3; 
+  
+  /* Premium deep matte charcoal for text readability */
+  --foreground: #2D3136; 
+  
+  /* RxLearn Signature Clinical Matte Teal */
+  --medical-primary: #1E7B92; 
+  
+  /* Bright Matte Action Blue for buttons like login/register */
+  --medical-secondary: #00A3E0; 
 }
 
 /* ✅ Global reset to prevent horizontal overflow */

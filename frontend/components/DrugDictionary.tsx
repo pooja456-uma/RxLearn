@@ -25,6 +25,7 @@ export default function DrugDictionary() {
   const [drugs, setDrugs] = useState<any[]>([]);
   const [selectedDrugName, setSelectedDrugName] = useState<string | null>(null);
 
+  // Data Retrieval
   useEffect(() => {
     fetch("http://127.0.0.1:8000/api/categories")
       .then((res) => res.json())
@@ -35,6 +36,7 @@ export default function DrugDictionary() {
       .then((data) => setDrugs(data || []));
   }, []);
 
+  // Text-to-Speech Engine (speak)
   const speak = (text: string) => {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
@@ -42,6 +44,7 @@ export default function DrugDictionary() {
     window.speechSynthesis.speak(utterance);
   };
 
+  // The Data Aggregator (grouped)
   const grouped = useMemo(() => {
     const map: Record<string, Drug> = {};
     drugs.forEach((d) => {
@@ -52,6 +55,7 @@ export default function DrugDictionary() {
     return Object.values(map);
   }, [drugs]);
 
+  // The Multi-Filter Logic (filtered)
   const filtered = useMemo(() => {
     return grouped.filter((d) => {
       const letterOk = selectedLetter === "All" || d.generic_name?.toUpperCase().startsWith(selectedLetter);
@@ -63,20 +67,20 @@ export default function DrugDictionary() {
   const selectedDrug = grouped.find((d) => d.generic_name === selectedDrugName);
 
   return (
-    <div className="h-screen flex bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 overflow-hidden font-sans relative">
+    <div className="h-screen flex bg-[#EBF0F3] overflow-hidden font-sans relative">
       <FloatingDecor />
 
       {/* LEFT SIDEBAR */}
-      <div className="w-[32%] min-w-[320px] bg-white border-r border-purple-100 shadow-xl flex flex-col z-20 relative">
-        <div className="p-5 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 text-white shadow-lg">
-          <h1 className="text-2xl font-black">💊 RxLearn</h1>
-          <p className="text-[10px] tracking-[0.3em] uppercase opacity-80">Interactive Drug Explorer</p>
+      <div className="w-[32%] min-w-[320px] bg-white border-r border-slate-300/60 shadow-sm flex flex-col z-20 relative">
+        <div className="p-5 bg-white border-b border-slate-200">
+          <h1 className="text-2xl font-black text-[#1E7B92]">RxLEARN</h1>
+          <p className="text-[10px] tracking-[0.3em] uppercase text-slate-400 font-bold mt-0.5">Interactive Drug Explorer</p>
         </div>
 
         {/* Dropdown Container with improved Z-Index */}
-        <div className="p-4 space-y-4 border-b bg-white relative z-50">
+        <div className="p-4 space-y-4 border-b border-slate-200 bg-white relative z-50">
           <div className="relative">
-             <label className="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-1 block ml-1">Filter Specialty</label>
+             <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Filter Specialty</label>
              <select
                value={selectedGroup}
                onChange={(e) => {
@@ -84,7 +88,7 @@ export default function DrugDictionary() {
                  setSelectedDrugName(null);
                }}
                /* Added z-50 and relative to the select itself */
-               className="w-full p-3 rounded-xl border-2 border-purple-100 text-xs font-bold shadow-sm outline-none bg-white cursor-pointer hover:border-purple-300 transition-all relative z-50"
+               className="w-full p-3 rounded-lg border border-slate-300 text-xs font-bold text-[#2D3136] shadow-sm outline-none bg-slate-50 cursor-pointer hover:border-[#1E7B92] transition-all relative z-50"
              >
                <option value="All Categories">All Categories</option>
                {categories.map((c) => (
@@ -96,12 +100,12 @@ export default function DrugDictionary() {
           </div>
 
           <div className="flex flex-wrap gap-1 justify-center">
-            <button onClick={() => setSelectedLetter("All")} className={`px-3 py-1 rounded-full text-[10px] font-bold ${selectedLetter === "All" ? "bg-purple-500 text-white" : "bg-pink-200"}`}>All</button>
+            <button onClick={() => setSelectedLetter("All")} className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition-all ${selectedLetter === "All" ? "bg-[#1E7B92] text-white shadow-sm" : "bg-slate-100 border border-slate-200 text-slate-500 hover:border-slate-300"}`}>All</button>
             {alphabet.map((l) => (
               <button
                 key={l}
                 onClick={() => setSelectedLetter(l)}
-                className={`w-7 h-7 rounded-full text-[10px] font-black transition ${selectedLetter === l ? "bg-purple-500 text-white shadow" : "bg-white border hover:bg-pink-50"}`}
+                className={`w-7 h-7 rounded-md text-[10px] font-black transition-all ${selectedLetter === l ? "bg-[#1E7B92] text-white shadow-sm" : "bg-white border border-slate-200 text-[#2D3136] hover:border-[#1E7B92]"}`}
               >
                 {l}
               </button>
@@ -109,23 +113,23 @@ export default function DrugDictionary() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-white/50">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50/50">
           {filtered.map((drug, i) => (
             <div
               key={i}
               onClick={() => setSelectedDrugName(drug.generic_name)}
-              className={`group p-4 rounded-2xl cursor-pointer transition-all duration-300 flex items-center justify-between ${selectedDrugName === drug.generic_name ? "bg-gradient-to-r from-pink-100 to-purple-100 border-2 border-purple-300 shadow-lg" : "bg-white hover:shadow-md hover:bg-purple-50"}`}
+              className={`group p-4 rounded-xl cursor-pointer border transition-all duration-300 flex items-center justify-between ${selectedDrugName === drug.generic_name ? "bg-white border-[#1E7B92] shadow-sm" : "bg-white border-slate-200 hover:shadow-sm hover:border-slate-300"}`}
             >
               <div>
-                <p className="font-bold text-sm text-slate-800">{drug.generic_name}</p>
-                <p className="text-[9px] uppercase tracking-[0.2em] text-pink-500 font-bold">{drug.therapeutic_group}</p>
+                <p className="font-bold text-sm text-[#2D3136]">{drug.generic_name}</p>
+                <p className="text-[9px] uppercase tracking-[0.2em] text-[#1E7B92] font-bold mt-1">{drug.therapeutic_group}</p>
               </div>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   speak(drug.generic_name);
                 }}
-                className="w-9 h-9 rounded-full bg-purple-100 group-hover:bg-purple-200 transition"
+                className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 text-slate-500 flex items-center justify-center group-hover:border-[#1E7B92] group-hover:text-[#1E7B92] transition"
               >
                 🔊
               </button>
@@ -137,25 +141,26 @@ export default function DrugDictionary() {
       {/* RIGHT CONTENT */}
       <div className="flex-1 overflow-y-auto p-6 z-10">
         {!selectedDrug ? (
-          <div className="h-full flex flex-col items-center justify-center text-purple-300">
-            <div className="text-8xl animate-bounce">💊</div>
-            <p className="mt-4 uppercase tracking-[0.4em] text-xs">Select a Drug Card</p>
+          <div className="h-full flex flex-col items-center justify-center text-slate-300">
+            <div className="text-8xl opacity-40">💊</div>
+            <p className="mt-4 uppercase tracking-[0.4em] text-xs font-bold">Select a Drug Card</p>
           </div>
         ) : (
           <div className="max-w-5xl mx-auto space-y-5 animate-in fade-in zoom-in-95 duration-500">
-            <div className="rounded-[35px] p-8 bg-gradient-to-r from-purple-600 via-pink-500 to-blue-500 text-white shadow-2xl">
+            <div className="rounded-xl p-8 bg-white border border-slate-300/60 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-[#1E7B92]" />
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="px-3 py-1 rounded-full bg-white/20 text-[10px] uppercase font-black">Clinical Monograph</span>
-                  <h2 className="text-4xl font-black mt-4">{selectedDrug.generic_name}</h2>
-                  <p className="text-xs uppercase tracking-[0.3em] opacity-80 mt-2">{selectedDrug.therapeutic_group}</p>
+                  <span className="px-3 py-1 rounded bg-[#EBF0F3] border border-slate-200 text-[10px] uppercase font-black text-[#1E7B92]">Clinical Monograph</span>
+                  <h2 className="text-4xl font-black text-[#2D3136] mt-4 uppercase tracking-tight">{selectedDrug.generic_name}</h2>
+                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400 font-bold mt-2">{selectedDrug.therapeutic_group}</p>
                 </div>
-                <button onClick={() => speak(selectedDrug.generic_name)} className="w-14 h-14 rounded-2xl bg-white/20 text-xl">🔊</button>
+                <button onClick={() => speak(selectedDrug.generic_name)} className="w-14 h-14 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 flex items-center justify-center text-xl hover:border-[#1E7B92] hover:text-[#1E7B92] transition">🔊</button>
               </div>
 
-              <div className="flex flex-wrap gap-2 mt-5">
+              <div className="flex flex-wrap gap-2 mt-5 border-t border-slate-100 pt-4">
                 {selectedDrug.brands.map((b:string, idx:number) => (
-                  <span key={idx} className="px-3 py-2 rounded-full bg-white/15 text-[10px] font-bold uppercase">{b}</span>
+                  <span key={idx} className="px-3 py-2 rounded-md bg-slate-50 border border-slate-200 text-[10px] font-bold text-slate-600 uppercase tracking-wide shadow-sm">{b}</span>
                 ))}
               </div>
             </div>
@@ -163,17 +168,17 @@ export default function DrugDictionary() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <DossierCard title="🎯 Indications & Usage" text={selectedDrug.indications} />
               <DossierCard title="⚙️ Mechanism of Action" text={selectedDrug.mechanism || "Consult pharmacological database for metabolic pathway."} />
-              <DossierCard title="⚠️ Safety Warnings" text={selectedDrug.side_effects} />
+              <DossierCard title="⚠️ Safety Warnings" text={selectedDrug.side_effects} isWarning />
               <DossierCard title="📦 Dosage Forms" text={selectedDrug.dosage_forms || "Tablet, Capsules, Injection"} />
               <DossierCard title="💡 Pharmacist Counseling" text={selectedDrug.counseling_points} highlight />
-              <DossierCard title="🚫 Contraindications" text={selectedDrug.contraindications || "Hypersensitivity to active substance."} />
+              <DossierCard title="🚫 Contraindications" text={selectedDrug.contraindications || "Hypersensitivity to active substance."} isWarning />
             </div>
 
             <button
               onClick={() => setSelectedDrugName(null)}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-purple-600 text-white font-black tracking-[0.3em] uppercase shadow-xl hover:scale-[1.01] transition"
+              className="w-full py-4 rounded-lg bg-[#1E7B92] text-white font-black tracking-[0.3em] uppercase shadow-sm hover:bg-[#15586e] transition-all active:scale-[0.99]"
             >
-              Close 💕
+              Close
             </button>
           </div>
         )}
@@ -183,14 +188,14 @@ export default function DrugDictionary() {
 }
 
 function FloatingDecor() {
-  const items = ["💊", "✨", "🫧", "💗"];
+  const items = ["💊", "🔍", "📋"];
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
       {items.map((icon, i) => (
         <span
           key={i}
-          className="absolute text-2xl animate-float"
-          style={{ left: `${Math.random() * 100}%`, animationDuration: `${7 + Math.random() * 5}s`, animationDelay: `${Math.random() * 4}s` }}
+          className="absolute text-xl opacity-5 animate-float"
+          style={{ left: `${(i + 1) * 25}%`, animationDuration: `${10 + i * 3}s`, animationDelay: `${i * 1.5}s` }}
         >
           {icon}
         </span>
@@ -198,19 +203,25 @@ function FloatingDecor() {
       <style jsx>{`
         .animate-float { bottom: -40px; animation: floatUp linear infinite; }
         @keyframes floatUp {
-          0% { transform: translateY(0); opacity: 0.5; }
-          100% { transform: translateY(-110vh); opacity: 0; }
+          0% { transform: translateY(0) rotate(0deg); opacity: 0.08; }
+          50% { opacity: 0.15; }
+          100% { transform: translateY(-110vh) rotate(360deg); opacity: 0; }
         }
       `}</style>
     </div>
   );
 }
 
-function DossierCard({ title, text, highlight = false }: { title: string; text?: string; highlight?: boolean }) {
+// Dynamic Content Rendering (DossierCard)
+function DossierCard({ title, text, highlight = false, isWarning = false }: { title: string; text?: string; highlight?: boolean; isWarning?: boolean }) {
+  let cardStyle = "bg-white border-slate-200 text-slate-700";
+  if (highlight) cardStyle = "bg-sky-50/50 border-sky-200 text-sky-950";
+  if (isWarning) cardStyle = "bg-rose-50/40 border-rose-200 text-rose-950";
+
   return (
-    <div className={`p-5 rounded-2xl border shadow-sm hover:shadow-lg transition ${highlight ? "bg-gradient-to-r from-yellow-50 to-pink-50 border-pink-200" : "bg-white/90 border-slate-100"}`}>
-      <h3 className="text-[10px] font-black uppercase tracking-[0.25em] text-purple-500 mb-3">{title}</h3>
-      <p className="text-sm text-slate-700 leading-relaxed">{text || "No data yet"}</p>
+    <div className={`p-5 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 cursor-default ${cardStyle}`}>
+      <h3 className={`text-[10px] font-black uppercase tracking-[0.25em] mb-3 ${highlight ? "text-[#1E7B92]" : isWarning ? "text-rose-600" : "text-slate-400"}`}>{title}</h3>
+      <p className="text-sm leading-relaxed font-medium">{text || "No data yet"}</p>
     </div>
   );
 }

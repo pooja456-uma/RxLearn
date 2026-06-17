@@ -35,8 +35,15 @@ export default function RxForum() {
     },
   ]);
 
+  // --- STATE DESIGN: STATEFUL LOOKUP OBJECT ---
+  // Tracks separate text inputs for each post's comment box dynamically.
+  // Using a Record object key-value map {[postId]: text} isolates state mutations 
+  // so typing in one post's comment box does not cause text to mirror across others.
   const [commentText, setCommentText] = useState<Record<string, string>>({});
 
+  // --- LOCAL STATE SIMULATION (POST LAYERING) ---
+  // Implements an optimistic, simulated asynchronous latency via setTimeout.
+  // Layers new posts seamlessly into the primary state array without mutating existing records.
   const handlePost = () => {
     if (!newPost.trim()) return;
 
@@ -46,19 +53,23 @@ export default function RxForum() {
       const createdPost = {
         id: Math.random().toString(),
         tag: "GENERAL",
-        author: "You 💖",
+        author: "You",
         content: newPost,
         replies: [],
         likes: 0,
         liked: false,
       };
 
-      setPosts([createdPost, ...posts]);
+      setPosts([createdPost, ...posts]); // Prepends new object to start of list
       setNewPost("");
       setLoading(false);
     }, 500);
   };
 
+  // --- IMMUTABLE MAPPING LOGIC (LIKE TOGGLER) ---
+  // Uses functional state mapping to safely toggle flags deeply nested in arrays.
+  // Prevents direct state mutation by using the spread operator (...p) to create 
+  // an entire structural clone of the targeted object before updating values.
   const toggleLike = (id: string) => {
     setPosts((prev) =>
       prev.map((p) =>
@@ -73,6 +84,10 @@ export default function RxForum() {
     );
   };
 
+  // --- DEEP NESTED DATA INJECTION (REPLY ENGINE) ---
+  // Modifies an inner child array (replies) housed within a parent object array.
+  // Clones the existing structure and drops the freshly typed comment array element 
+  // directly into the precise sub-thread where it belongs.
   const addComment = (postId: string) => {
     const text = commentText[postId];
     if (!text?.trim()) return;
@@ -86,7 +101,7 @@ export default function RxForum() {
                 ...p.replies,
                 {
                   id: Math.random().toString(),
-                  author: "You 💖",
+                  author: "You",
                   text,
                 },
               ],
@@ -95,98 +110,98 @@ export default function RxForum() {
       )
     );
 
+    // Flushes input buffer cleanly for the explicit post's key entry field
     setCommentText((prev) => ({ ...prev, [postId]: "" }));
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-10 bg-gradient-to-b from-pink-50 via-white to-purple-50 min-h-screen">
+    <div className="max-w-6xl mx-auto p-6 space-y-10 bg-[#EBF0F3] min-h-screen text-[#2D3136] selection:bg-[#1E7B92]/20 selection:text-[#1E7B92]">
 
       {/* HEADER */}
-      <div className="text-center space-y-2">
-        <h1 className="text-4xl font-black">
-          💊 Rx<span className="text-pink-500">Forum</span>
+      <div className="text-center space-y-1">
+        <h1 className="text-3xl font-black tracking-tight text-[#1E7B92] uppercase">
+          RxLEARN FORUM
         </h1>
-        <p className="text-[10px] uppercase tracking-[0.3em] text-slate-400 font-bold">
-          learn together, grow together ✨
+        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+          learn together, grow together
         </p>
       </div>
 
       {/* POST BOX */}
-      <div className="bg-white p-6 rounded-[30px] shadow-sm border border-pink-100 space-y-4">
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-300/60 space-y-4 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-slate-200" />
         <textarea
           value={newPost}
           onChange={(e) => setNewPost(e.target.value)}
-          placeholder="Ask or share something 💬"
-          className="w-full p-5 rounded-2xl bg-pink-50 outline-none min-h-[120px] text-sm"
+          placeholder="Ask or share something..."
+          className="w-full p-4 rounded-lg bg-slate-50 border border-slate-200 text-[#2D3136] placeholder-slate-400 outline-none focus:border-[#1E7B92] focus:bg-white text-xs font-semibold min-h-[120px] transition-all shadow-inner resize-none"
         />
 
         <div className="flex justify-end">
           <button
             onClick={handlePost}
-            className="px-6 py-3 rounded-full bg-pink-500 text-white text-[10px] font-black"
+            className="px-5 py-2.5 rounded-lg bg-[#00A3E0] text-white text-[10px] font-bold uppercase tracking-wider hover:bg-[#008CBA] transition-all active:scale-[0.98] shadow-sm"
           >
-            {loading ? "posting..." : "post 💌"}
+            {loading ? "posting..." : "post asset"}
           </button>
         </div>
       </div>
 
-      {/* POSTS */}
+      {/* POSTS LISTING */}
       {posts.map((post) => (
         <div
           key={post.id}
-          className="bg-white p-6 rounded-[30px] border border-pink-100 space-y-4"
+          className="bg-white p-6 rounded-xl border border-slate-300/60 shadow-sm space-y-4 transition-all duration-200 hover:shadow-md"
         >
 
-          {/* POST */}
-          <div className="flex justify-between text-[10px] font-black uppercase">
-            <span className="bg-pink-100 text-pink-600 px-3 py-1 rounded-full">
+          {/* POST HEADER META */}
+          <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider">
+            <span className="bg-[#EBF0F3] border border-slate-200 text-[#1E7B92] px-3 py-1 rounded-md">
               {post.tag}
             </span>
             <span className="text-slate-400">{post.author}</span>
           </div>
 
-          <p className="italic text-slate-700">“{post.content}”</p>
+          <p className="text-sm font-medium text-slate-700">“{post.content}”</p>
 
-          {/* ACTIONS */}
-          <div className="flex justify-between text-xs border-t pt-3">
-
+          {/* ACTIONS INTERACTION BAR */}
+          <div className="flex justify-between text-xs border-t border-slate-100 pt-3">
             <button
               onClick={() => toggleLike(post.id)}
-              className="text-rose-400 font-black"
+              className={`font-bold transition-all active:scale-[0.95] ${post.liked ? "text-rose-600" : "text-rose-400 hover:text-rose-600"}`}
             >
-              💖 {post.likes}
+              ❤️ {post.likes}
             </button>
 
             <button
               onClick={() =>
                 setOpenComments(openComments === post.id ? null : post.id)
               }
-              className="text-slate-500 font-bold"
+              className="text-slate-400 hover:text-[#1E7B92] font-bold uppercase text-[10px] tracking-wider transition-colors"
             >
               💬 {post.replies.length} comments
             </button>
-
           </div>
 
-          {/* COMMENTS SECTION */}
+          {/* CONDITIONAL COMMENTS COLLAPSE THREAD */}
           {openComments === post.id && (
-            <div className="space-y-3 pt-3 border-t">
+            <div className="space-y-3 pt-3 border-t border-slate-100 animate-in fade-in slide-in-from-top-1 duration-200">
 
-              {/* existing comments */}
+              {/* RENDER CURRENT COMMENT NEST */}
               {post.replies.map((c) => (
                 <div
                   key={c.id}
-                  className="bg-pink-50 p-3 rounded-xl text-xs text-slate-700"
+                  className="bg-slate-50 border border-slate-200 p-3 rounded-lg text-xs text-slate-600 font-medium"
                 >
-                  <span className="font-bold text-pink-500">
-                    {c.author}
+                  <span className="font-bold text-[#1E7B92] uppercase tracking-wide mr-1.5">
+                    {c.author}:
                   </span>{" "}
                   {c.text}
                 </div>
               ))}
 
-              {/* add comment */}
-              <div className="flex gap-2">
+              {/* REPLY FIELD ACTIONS */}
+              <div className="flex gap-2 pt-1">
                 <input
                   value={commentText[post.id] || ""}
                   onChange={(e) =>
@@ -196,11 +211,11 @@ export default function RxForum() {
                     })
                   }
                   placeholder="Write a comment..."
-                  className="flex-1 p-2 rounded-xl bg-pink-50 text-xs outline-none"
+                  className="flex-1 p-2.5 px-4 rounded-lg bg-slate-50 border border-slate-200 text-xs text-[#2D3136] outline-none focus:border-[#1E7B92] focus:bg-white shadow-inner transition-all"
                 />
                 <button
                   onClick={() => addComment(post.id)}
-                  className="bg-pink-500 text-white px-3 rounded-xl text-[10px]"
+                  className="bg-[#1E7B92] text-white px-4 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-[#15586e] active:scale-[0.97] transition-all"
                 >
                   send
                 </button>
