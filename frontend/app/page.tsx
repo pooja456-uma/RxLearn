@@ -105,15 +105,15 @@ export default function RxLearnPlatform() {
   const renderTabContent = () => {
     switch (activeTab) {
       case "home": 
-        return <Dashboard onNavigate={globalNavigate} />;
+        return <Dashboard />;
       case "dashboard": 
-        return <Dashboard onNavigate={globalNavigate} />;
+        return <Dashboard />;
       case "ocr lab": 
         return <OcrLab />;
       case "dictionary": 
         return <DrugDictionary />;
       case "progress": 
-        return <MyProgress onNavigate={globalNavigate} />;
+        return <MyProgress />;
       case "educational lab": 
         return <EducationalLab />;
       case "rxforum": 

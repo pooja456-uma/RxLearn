@@ -66,7 +66,7 @@ function calcStreak(
   drugChecks: DrugCheck[],
 ): number {
   const dates = new Set(
-    ...[history, ocrScans, drugChecks]
+    [...history, ...ocrScans, ...drugChecks]
       .filter((i) => i.date)
       .map((i) => new Date(i.date).toDateString()),
   );
@@ -204,7 +204,7 @@ export default function ProgressPage() {
 
     // 30-day streak calendar
     const activeDates = new Set(
-      ...[quizHistory, ocrScans, drugChecks]
+      [...quizHistory, ...ocrScans, ...drugChecks]
         .filter((i) => i.date)
         .map((i) => new Date(i.date).toDateString()),
     );

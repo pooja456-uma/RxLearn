@@ -5,6 +5,9 @@ import traceback
 
 router = APIRouter()
 
+# ==========================================
+# EXISTING METHOD (PRESERVED UNCHANGED)
+# ==========================================
 @router.post("/api/support/ticket")
 async def submit_support_ticket(ticket: TicketRequest):
     # This will print in your terminal so you can see if data arrived
@@ -43,6 +46,56 @@ async def submit_support_ticket(ticket: TicketRequest):
             conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# ==========================================
+# NEW ADMIN MANAGEMENT ENDPOINTS APPENDED
+# ==========================================
+
+@router.get("/api/admin/tickets")
+def get_all_tickets():
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database offline")
+        
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT * FROM support_tickets ORDER BY created_at DESC")
+        tickets = cursor.fetchall()
+        return tickets
+    except Exception as e:
+        print("--- ADMIN TICKETS FETCH ERROR ---")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.put("/api/admin/tickets/{ticket_id}")
+def update_ticket_status(ticket_id: int, status_update: dict):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=503, detail="Database offline")
+        
+    cursor = conn.cursor()
+    try:
+        new_status = status_update.get("status", "Resolved")
+        cursor.execute(
+            "UPDATE support_tickets SET status = %s WHERE ticket_id = %s",
+            (new_status, ticket_id)
+        )
+        conn.commit()
+        print(f"✅ Ticket ID {ticket_id} status updated to: {new_status}")
+        return {"status": "success", "message": "Ticket status updated successfully"}
+    except Exception as e:
+        print("--- ADMIN TICKET UPDATE ERROR ---")
+        print(traceback.format_exc())
+        if conn:
+            conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         cursor.close()
         conn.close()
