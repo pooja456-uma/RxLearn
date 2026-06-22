@@ -11,6 +11,7 @@ import MyProgress from "../components/MyProgress";
 import EducationalLab from "../components/EducationalLab";
 import RxForum from "../components/RxForum";
 import Contact from "../components/Contact";
+import AIChatbox from "../components/AIChatbox"; // Imported your AI Preceptor component
 
 // Profile Icon Mapping
 const AVATAR_MAP: Record<number, string> = {
@@ -267,6 +268,10 @@ export default function RxLearnPlatform() {
       <footer className="relative z-10 text-center p-8">
         <p className="text-[10px] font-bold tracking-[0.3em] text-slate-400 uppercase">RxLearn Platform • Sri Lanka • 2026</p>
       </footer>
+
+      {/* FLOATING AI ASSISTANT LAYOUT INJECTED AT ROOT VIEW LEVEL */}
+      <AIChatbox />
+
     </div>
   );
 }
