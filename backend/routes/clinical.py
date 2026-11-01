@@ -4,42 +4,90 @@ from datetime import datetime
 from database import get_db_connection
 from models import ForumPostCreate, ForumCommentCreate, GameLogCreate, DrugCreateRequest, SignupRequest
 import traceback
+import json
+from google import genai
+from google.genai import types
 
 router = APIRouter()
 
+# Initialize the Gemini SDK client (automatically grabs GEMINI_API_KEY from .env)
+client = genai.Client()
+
 # ==========================================
-# EXISTING METHODS (PRESERVED UNCHANGED)
+# UPDATED AI OCR PRESCRIPTION ENDPOINT
 # ==========================================
 
 @router.post("/ocr")
 async def perform_ocr(file: UploadFile = File(...)):
-    conn = get_db_connection()
-    if not conn: return {"success": False, "error": "Database Offline"}
-    cursor = conn.cursor(dictionary=True)
     try:
-        query = "SELECT * FROM drugs ORDER BY RAND() LIMIT 2"
-        cursor.execute(query)
-        db_meds = cursor.fetchall()
+        # Read raw uploaded prescription image bytes directly
+        image_bytes = await file.read()
+        
+        # Clinical context prompt instructing Gemini how to evaluate medical scripts
+        prompt = """
+        You are an expert clinical pharmacy preceptor. Analyze this handwritten prescription image meticulously.
+        
+        Follow these strict guidelines:
+        1. Look for medical context clues like doctor specialty stamps (e.g., Dermatologist, Cardiologist) or facility names to narrow down drug possibilities.
+        2. Read the cursive handwritten brand/generic names, strengths, and frequency rules.
+        3. Match them accurately against valid clinical pharmacology datasets. If a word is a topical cream or skin antibiotic, do not match it to an oral antidiabetic or blood thinner.
+        4. Provide an institutional safety validation check if any dangerous combinations or missing parameters exist.
+        """
+        
+        # Request structured object response matching your exact UI properties
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                types.Part.from_bytes(
+                    data=image_bytes,
+                    mime_type=file.content_type,
+                ),
+                prompt
+            ],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema={
+                    "type": "OBJECT",
+                    "properties": {
+                        "success": {"type": "BOOLEAN"},
+                        "medications": {
+                            "type": "ARRAY",
+                            "items": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "brand_name": {"type": "STRING"},
+                                    "generic_name": {"type": "STRING"},
+                                    "strength": {"type": "STRING"},
+                                    "frequency": {"type": "STRING"},
+                                    "verified": {"type": "BOOLEAN"},
+                                    "confidence": {"type": "INTEGER"},
+                                    "description": {"type": "STRING"},
+                                    "raw_text": {"type": "STRING"}
+                                },
+                                "required": ["brand_name", "generic_name", "strength", "frequency", "verified"]
+                            }
+                        },
+                        "analysis": {
+                            "type": "ARRAY",
+                            "items": {"type": "STRING"}
+                        }
+                    },
+                    "required": ["success", "medications", "analysis"]
+                }
+            ),
+        )
+        
+        # Parse the structured model output directly back to your frontend state engine
+        return json.loads(response.text)
 
-        medications = []
-        for med in db_meds:
-            strength_val = med['strength'] if 'strength' in med else (med['dosage'] if 'dosage' in med else "500mg")
-            medications.append({
-                "brand_name": med['brand_name'],
-                "generic_name": med['generic_name'],
-                "strength": strength_val,
-                "frequency": "1-0-1 (Post Food)",
-                "verified": True,
-                "confidence": random.randint(85, 99),
-                "description": med['indications'],
-                "raw_text": f"Detected: {med['brand_name']}"
-            })
-        return {"success": True, "medications": medications, "analysis": ["No therapeutic duplication detected."]}
     except Exception as e:
-        return {"success": False, "error": str(e)}
-    finally:
-        cursor.close()
-        conn.close()
+        print("🔴 GEMINI MULTIMODAL ROUTE FAILURE:", traceback.format_exc())
+        return {"success": False, "error": f"AI Parsing Exception: {str(e)}"}
+
+
+# ==========================================
+# EXISTING METHODS (PRESERVED UNCHANGED)
+# ==========================================
 
 @router.get("/api/categories")
 async def get_categories():
@@ -239,7 +287,6 @@ def admin_create_user(user: SignupRequest):
     if not conn: raise HTTPException(status_code=503, detail="Database offline")
     cursor = conn.cursor(dictionary=True)
     try:
-        # Enforce exact sequential registration tracking logic matching auth.py
         cursor.execute("SELECT registration_number FROM users WHERE registration_number LIKE 'RX-2026-%' ORDER BY registration_number DESC LIMIT 1")
         last_user = cursor.fetchone()
         

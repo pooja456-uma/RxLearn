@@ -1,8 +1,29 @@
-# Backend junk
+# ==========================================
+# RxLearn - Git Ignore
+# ==========================================
+
+# Backend
 backend/venv/
+.venv/
 backend/__pycache__/
+__pycache__/
 *.pyc
 
-# Frontend junk
+# Frontend
 frontend/node_modules/
 frontend/.next/
+node_modules/
+.next/
+
+# Environment variables and secret keys
+.env
+.env.*
+!.env.example
+
+# Python cache and testing
+.pytest_cache/
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
