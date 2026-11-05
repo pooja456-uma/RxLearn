@@ -352,3 +352,19 @@ async def update_profile(
     finally:
         cursor.close()
         conn.close()
+
+
+# --------------------------------------------------
+# 5. ADMIN AUTHORIZATION HELPER
+# --------------------------------------------------
+
+def require_admin(
+    current_user: dict = Depends(get_current_user)
+):
+    if current_user["role"] != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Administrator access required"
+        )
+
+    return current_user

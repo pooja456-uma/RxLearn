@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 import random
 from datetime import datetime
 from database import get_db_connection
@@ -7,6 +7,13 @@ import traceback
 import json
 from google import genai
 from google.genai import types
+from routes.auth import require_admin
+from security import hash_password
+from typing import Optional
+
+class AdminUserUpdate(SignupRequest):
+    # Editing a user does not require resetting their password.
+    password: Optional[str] = None
 
 router = APIRouter()
 
@@ -25,13 +32,30 @@ async def perform_ocr(file: UploadFile = File(...)):
         
         # Clinical context prompt instructing Gemini how to evaluate medical scripts
         prompt = """
-        You are an expert clinical pharmacy preceptor. Analyze this handwritten prescription image meticulously.
-        
-        Follow these strict guidelines:
-        1. Look for medical context clues like doctor specialty stamps (e.g., Dermatologist, Cardiologist) or facility names to narrow down drug possibilities.
-        2. Read the cursive handwritten brand/generic names, strengths, and frequency rules.
-        3. Match them accurately against valid clinical pharmacology datasets. If a word is a topical cream or skin antibiotic, do not match it to an oral antidiabetic or blood thinner.
-        4. Provide an institutional safety validation check if any dangerous combinations or missing parameters exist.
+        Analyze this prescription for pharmacy-student education. Read only legible
+        details. Do not guess medication names, doses, directions, patient details,
+        or interactions. Identify uncertainty explicitly. Distinguish image text
+        from AI interpretation. For veterinary prescriptions, state that the
+        patient is an animal and avoid human dosing or counseling advice.
+
+        Return JSON exactly matching the response schema:
+        - medications: brand_name (use "Not specified" if absent), generic_name,
+          strength, frequency, verified, confidence, description, raw_text.
+          Do not invent brands. Use verified=false for uncertain readings.
+          Confidence is an AI estimate, NOT a validated accuracy percentage.
+        - analysis: up to 3 prescription-specific review observations.
+        - educational_report: all six required arrays, each with 1-3 concise,
+          specific learning points where relevant; use [] when not applicable.
+          drug_education: drug class, mechanism, indications, key adverse effects.
+          prescription_abbreviations: only abbreviations visible in the image.
+          safety_observations: potential risks and what requires verification.
+          missing_information: important absent or unreadable information.
+          patient_counseling: general educational counseling considerations.
+          learning_takeaways: practical pharmacy-student lessons.
+
+        Avoid repetition. Do not claim prescriptions or doses are clinically safe.
+        Do not provide personalized treatment recommendations. If information
+        cannot be established, say so briefly. Educational use only.
         """
         
         # Request structured object response matching your exact UI properties
@@ -70,9 +94,25 @@ async def perform_ocr(file: UploadFile = File(...)):
                         "analysis": {
                             "type": "ARRAY",
                             "items": {"type": "STRING"}
+                        },
+                        "educational_report": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "drug_education": {"type": "ARRAY", "items": {"type": "STRING"}},
+                                "prescription_abbreviations": {"type": "ARRAY", "items": {"type": "STRING"}},
+                                "safety_observations": {"type": "ARRAY", "items": {"type": "STRING"}},
+                                "missing_information": {"type": "ARRAY", "items": {"type": "STRING"}},
+                                "patient_counseling": {"type": "ARRAY", "items": {"type": "STRING"}},
+                                "learning_takeaways": {"type": "ARRAY", "items": {"type": "STRING"}}
+                            },
+                            "required": [
+                                "drug_education", "prescription_abbreviations",
+                                "safety_observations", "missing_information",
+                                "patient_counseling", "learning_takeaways"
+                            ]
                         }
                     },
-                    "required": ["success", "medications", "analysis"]
+                    "required": ["success", "medications", "analysis", "educational_report"]
                 }
             ),
         )
@@ -200,7 +240,7 @@ def log_game_session(log: GameLogCreate):
 # ==========================================
 
 @router.post("/api/drugs")
-def create_new_drug(drug: DrugCreateRequest):
+def create_new_drug(drug: DrugCreateRequest, admin: dict = Depends(require_admin)):
     conn = get_db_connection()
     if not conn: raise HTTPException(status_code=503, detail="Database offline")
     cursor = conn.cursor()
@@ -223,7 +263,7 @@ def create_new_drug(drug: DrugCreateRequest):
         conn.close()
 
 @router.put("/api/drugs/{drug_id}")
-def update_existing_drug(drug_id: int, drug: DrugCreateRequest):
+def update_existing_drug(drug_id: int, drug: DrugCreateRequest, admin: dict = Depends(require_admin)):
     conn = get_db_connection()
     if not conn: raise HTTPException(status_code=503, detail="Database offline")
     cursor = conn.cursor()
@@ -247,7 +287,7 @@ def update_existing_drug(drug_id: int, drug: DrugCreateRequest):
         conn.close()
 
 @router.delete("/api/drugs/{drug_id}")
-def delete_existing_drug(drug_id: int):
+def delete_existing_drug(drug_id: int, admin: dict = Depends(require_admin)):
     conn = get_db_connection()
     if not conn: raise HTTPException(status_code=503, detail="Database offline")
     cursor = conn.cursor()
@@ -268,12 +308,12 @@ def delete_existing_drug(drug_id: int):
 # ==========================================
 
 @router.get("/api/admin/users")
-def get_all_users():
+def get_all_users(admin: dict = Depends(require_admin)):
     conn = get_db_connection()
     if not conn: raise HTTPException(status_code=503, detail="Database offline")
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.execute("SELECT registration_number, full_name, username, email, password, gender, age, contact_number, nic_number, role FROM users ORDER BY registration_number ASC")
+        cursor.execute("SELECT registration_number, full_name, username, email, gender, age, contact_number, nic_number, role FROM users ORDER BY registration_number ASC")
         return cursor.fetchall()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -282,7 +322,7 @@ def get_all_users():
         conn.close()
 
 @router.post("/api/admin/users")
-def admin_create_user(user: SignupRequest):
+def admin_create_user(user: SignupRequest, admin: dict = Depends(require_admin)):
     conn = get_db_connection()
     if not conn: raise HTTPException(status_code=503, detail="Database offline")
     cursor = conn.cursor(dictionary=True)
@@ -304,7 +344,7 @@ def admin_create_user(user: SignupRequest):
                    (registration_number, full_name, username, email, password, gender, age, contact_number, nic_number, role) 
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'student')"""
         
-        values = (reg_no, user.full_name, user.username, user.email, user.password, user.gender, user.age, user.contact_number, user.nic_number)
+        values = (reg_no, user.full_name, user.username, user.email, hash_password(user.password), user.gender, user.age, user.contact_number, user.nic_number)
         cursor.execute(query, values)
         conn.commit()
         return {"status": "success", "message": f"Profile created under {reg_no}"}
@@ -316,17 +356,22 @@ def admin_create_user(user: SignupRequest):
         conn.close()
 
 @router.put("/api/admin/users/{reg_num}")
-def admin_update_user(reg_num: str, user: SignupRequest):
+def admin_update_user(reg_num: str, user: AdminUserUpdate, admin: dict = Depends(require_admin)):
     conn = get_db_connection()
     if not conn: raise HTTPException(status_code=503, detail="Database offline")
     cursor = conn.cursor()
     try:
         query = """
-            UPDATE users 
-            SET full_name=%s, username=%s, email=%s, password=%s, gender=%s, age=%s, contact_number=%s, nic_number=%s 
-            WHERE registration_number=%s
+            UPDATE users
+            SET full_name=%s, username=%s, email=%s, gender=%s, age=%s, contact_number=%s, nic_number=%s
         """
-        cursor.execute(query, (user.full_name, user.username, user.email, user.password, user.gender, user.age, user.contact_number, user.nic_number, reg_num))
+        values = [user.full_name, user.username, user.email, user.gender, user.age, user.contact_number, user.nic_number]
+        if user.password and user.password.strip():
+            query += ", password=%s"
+            values.append(hash_password(user.password))
+        query += " WHERE registration_number=%s"
+        values.append(reg_num)
+        cursor.execute(query, tuple(values))
         conn.commit()
         return {"status": "success", "message": "User file saved successfully."}
     except Exception as e:
@@ -337,7 +382,7 @@ def admin_update_user(reg_num: str, user: SignupRequest):
         conn.close()
 
 @router.delete("/api/admin/users/{reg_num}")
-def admin_delete_user(reg_num: str):
+def admin_delete_user(reg_num: str, admin: dict = Depends(require_admin)):
     conn = get_db_connection()
     if not conn: raise HTTPException(status_code=503, detail="Database offline")
     cursor = conn.cursor()

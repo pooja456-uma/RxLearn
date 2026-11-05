@@ -73,6 +73,11 @@ export default function AdminPortalPage() {
     setTimeout(() => setStatusMessage(null), 4000);
   };
 
+  const getAdminHeaders = () => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}`,
+  });
+
   const fetchAllData = async () => {
     try {
       const drugRes = await fetch("http://127.0.0.1:8000/api/drugs/search?query=");
@@ -81,7 +86,7 @@ export default function AdminPortalPage() {
       const ticketRes = await fetch("http://127.0.0.1:8000/api/admin/tickets");
       if (ticketRes.ok) setTickets(await ticketRes.json());
 
-      const userRes = await fetch("http://127.0.0.1:8000/api/admin/users");
+      const userRes = await fetch("http://127.0.0.1:8000/api/admin/users", { headers: getAdminHeaders() });
       if (userRes.ok) setUsers(await userRes.json());
     } catch (err) {
       console.error("Failed to hydrate admin console tables", err);
@@ -108,7 +113,7 @@ export default function AdminPortalPage() {
 
     const url = isEditingDrug ? `http://127.0.0.1:8000/api/drugs/${currentDrug.id}` : "http://127.0.0.1:8000/api/drugs";
     const method = isEditingDrug ? "PUT" : "POST";
-    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(currentDrug) });
+    const res = await fetch(url, { method, headers: getAdminHeaders(), body: JSON.stringify(currentDrug) });
     if (res.ok) {
       fetchAllData();
       triggerNotification(isEditingDrug ? "🔄 Formulation updated successfully!" : "➕ New drug added successfully!", "success");
@@ -118,7 +123,7 @@ export default function AdminPortalPage() {
 
   const handleDeleteDrug = async (id?: number) => {
     if (!id || !confirm("Are you sure you want to delete this drug formulation?")) return;
-    const res = await fetch(`http://127.0.0.1:8000/api/drugs/${id}`, { method: "DELETE" });
+    const res = await fetch(`http://127.0.0.1:8000/api/drugs/${id}`, { method: "DELETE", headers: getAdminHeaders() });
     if (res.ok) { fetchAllData(); triggerNotification("🗑️ Formulation deleted from system records.", "error"); }
   };
 
@@ -134,7 +139,7 @@ export default function AdminPortalPage() {
   // --- USER HANDLERS ---
   const handleUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const fieldsToValidate = Object.entries(currentUser).filter(([key]) => key !== 'registration_number' && key !== 'role');
+    const fieldsToValidate = Object.entries(currentUser).filter(([key]) => key !== 'registration_number' && key !== 'role' && (!isEditingUser || key !== 'password'));
     if (fieldsToValidate.some(([_, value]) => !value || value.toString().trim() === "")) {
       triggerNotification("⚠️ Validation Failed: All identity profile fields are required!", "error");
       return;
@@ -142,7 +147,7 @@ export default function AdminPortalPage() {
 
     const url = isEditingUser ? `http://127.0.0.1:8000/api/admin/users/${currentUser.registration_number}` : "http://127.0.0.1:8000/api/admin/users";
     const method = isEditingUser ? "PUT" : "POST";
-    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(currentUser) });
+    const res = await fetch(url, { method, headers: getAdminHeaders(), body: JSON.stringify(currentUser) });
     if (res.ok) {
       fetchAllData();
       triggerNotification(isEditingUser ? "🔄 Profile modified successfully!" : "👤 New profile appended successfully!", "success");
@@ -152,7 +157,7 @@ export default function AdminPortalPage() {
 
   const handleDeleteUser = async (regNum: string) => {
     if (!regNum || !confirm(`Are you sure you want to permanently delete profile data for ${regNum}?`)) return;
-    const res = await fetch(`http://127.0.0.1:8000/api/admin/users/${regNum}`, { method: "DELETE" });
+    const res = await fetch(`http://127.0.0.1:8000/api/admin/users/${regNum}`, { method: "DELETE", headers: getAdminHeaders() });
     if (res.ok) { fetchAllData(); triggerNotification("🗑️ Institutional student profile dropped.", "error"); }
   };
 
@@ -342,7 +347,7 @@ export default function AdminPortalPage() {
                   <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Full Identity Name</label><input required placeholder="e.g., Hiruka Demitha" value={currentUser.full_name} onChange={e=>setCurrentUser({...currentUser, full_name:e.target.value})} className="w-full p-2.5 text-xs font-bold rounded-lg border bg-slate-50" /></div>
                   <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Username Handle</label><input required placeholder="e.g., HiruDe" value={currentUser.username} onChange={e=>setCurrentUser({...currentUser, username:e.target.value})} className="w-full p-2.5 text-xs font-bold rounded-lg border bg-slate-50" /></div>
                   <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Email Account Address</label><input required type="email" placeholder="e.g., name@gmail.com" value={currentUser.email} onChange={e=>setCurrentUser({...currentUser, email:e.target.value})} className="w-full p-2.5 text-xs font-bold rounded-lg border bg-slate-50" /></div>
-                  <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Account Access Password</label><input required placeholder="Access Password" value={currentUser.password} onChange={e=>setCurrentUser({...currentUser, password:e.target.value})} className="w-full p-2.5 text-xs font-bold rounded-lg border bg-slate-50" /></div>
+                  <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Account Access Password</label><input placeholder={isEditingUser ? "Leave blank to keep existing password" : "Access Password"} type="password" required={!isEditingUser} value={currentUser.password || ""} onChange={e=>setCurrentUser({...currentUser, password:e.target.value})} className="w-full p-2.5 text-xs font-bold rounded-lg border bg-slate-50" /></div>
                   <div className="grid grid-cols-2 gap-2">
                     <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Gender Matrix</label><select value={currentUser.gender} onChange={e=>setCurrentUser({...currentUser, gender:e.target.value})} className="w-full p-2.5 text-xs font-bold rounded-lg border bg-slate-50"><option value="Male">Male</option><option value="Female">Female</option></select></div>
                     <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Age Matrix</label><input required type="number" value={currentUser.age} onChange={e=>setCurrentUser({...currentUser, age:parseInt(e.target.value)||0})} className="w-full p-2.5 text-xs font-bold rounded-lg border bg-slate-50" /></div>
@@ -366,7 +371,7 @@ export default function AdminPortalPage() {
                           <td className="p-4 font-black text-[#1E7B92] font-mono">{u.registration_number}</td>
                           <td className="p-4 font-bold"><div>{u.full_name}</div><div className="text-[10px] text-slate-400 font-mono">@{u.username} • {u.age}Y / {u.gender}</div></td>
                           <td className="p-4 text-slate-500"><div>{u.email}</div><div className="text-[10px] text-slate-400 font-mono">{u.contact_number}</div></td>
-                          <td className="p-4 text-center space-x-1.5 flex justify-center items-center"><button onClick={()=>{setIsEditingUser(true); setCurrentUser(u);}} className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded font-bold uppercase text-[9px] transition-all">Edit</button><button onClick={()=>handleDeleteUser(u.registration_number)} className="px-2.5 py-1 bg-rose-50 text-rose-600 border border-rose-200 rounded font-bold uppercase text-[9px] transition-all">Delete</button></td>
+                          <td className="p-4 text-center space-x-1.5 flex justify-center items-center"><button onClick={()=>{setIsEditingUser(true); setCurrentUser({...u, password: ""});}} className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded font-bold uppercase text-[9px] transition-all">Edit</button><button onClick={()=>handleDeleteUser(u.registration_number)} className="px-2.5 py-1 bg-rose-50 text-rose-600 border border-rose-200 rounded font-bold uppercase text-[9px] transition-all">Delete</button></td>
                         </tr>
                       ))}
                     </tbody>
